@@ -85,6 +85,8 @@ jobs:
           echo "using $ARCHIVE"
 
           tar xf "$ARCHIVE" -C "$TC" --strip-components=1
+          # the archive extracts read-only; we need to add our own symlinks
+          chmod -R u+w "$TC"
 
           # Normalise the tool names: whatever triple the archive uses, expose
           # everything as $CROSS-* so the rest of the workflow is uniform.
@@ -96,7 +98,9 @@ jobs:
             ln -sfn "$t" "$TC/bin/$CROSS-${b#"$TRIPLE"-}"
           done
           for t in gcc cpp ar as ld nm objcopy objdump ranlib readelf strip; do
-            [ -e "$TC/bin/$TRIPLE-$t" ] && ln -sfn "$TC/bin/$TRIPLE-$t" "$TC/bin/$CROSS-$t"
+            if [ -e "$TC/bin/$TRIPLE-$t" ]; then
+              ln -sfn "$TC/bin/$TRIPLE-$t" "$TC/bin/$CROSS-$t"
+            fi
           done
           echo "$TC/bin" >> "$GITHUB_PATH"
 
