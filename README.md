@@ -84,6 +84,28 @@ does not match when it walks a `capath`, so the wrapper concatenates them into
 `pyhome/ssl/cacerts.pem` and exports `SSL_CERT_FILE`. With that,
 `ssl.create_default_context()` verifies normally (TLS 1.3, HTTP 200 verified).
 
+**Run your own scripts.**
+
+```
+adb shell "su -c '/data/local/tmp/py /sdcard/myscript.py arg1 arg2'"
+adb shell "/data/local/tmp/py /sdcard/myscript.py"          # shell user, subprocess works
+adb shell "su -c 'sh /data/local/tmp/t.py'"                  # interactive-ish
+```
+
+Use `/sdcard` only after running `device/sdcard.sh` (see below), otherwise
+point at `/storage/emulated/0/myscript.py`.
+
+**`/sdcard` is a dead symlink on this ROM.** It lives in the read-only
+initramfs rootfs and points at `/storage/emulated/legacy`, which has mode `000`
+because Android 5.1 legacy storage is off, so `adb push x /sdcard/` and any
+app's `/sdcard/...` access fails. The symlink cannot be edited, so
+`device/sdcard.sh` bind-mounts the real volume over the path it points at.
+Nothing on disk changes; it must be re-run after each reboot:
+
+```
+adb shell "su -c 'sh /data/local/tmp/sdcard.sh'"      # umount to undo
+```
+
 **Root vs. `shell`.** This ROM's SELinux policy denies `execve` to processes
 running in the `init` domain that SuperSU gives you, so under `su` **any**
 `subprocess` call fails with `PermissionError: [Errno 13]` — including
@@ -92,7 +114,7 @@ sqlite3, file I/O) works as root. Run as the `shell` user instead if you need
 `subprocess`:
 
 ```
-adb shell "/data/local/tmp/py /sdcard/script.py"      # subprocess works
+adb shell "/data/local/tmp/py /sdcard/myscript.py"      # subprocess works
 ```
 
 **Time zones.** Android has no `zoneinfo` tree and `tzdata` is not installed,
