@@ -11,13 +11,21 @@ export PYTHONUTF8=1
 export PYTHONIOENCODING=utf-8
 unset PYTHONPATH
 
-# OpenSSL was built with its own openssldir, so point it at the CA store
-# Android already ships. Without this, ssl.create_default_context() cannot
-# verify any server.
+# OpenSSL was built with its own openssldir, and Android's CA directory uses
+# file names OpenSSL 3.x will not match when looking a capath up. So build a
+# plain PEM bundle from Android's CA store once and point SSL_CERT_FILE at it;
+# that makes ssl.create_default_context() verify real servers out of the box.
 CACERTS=/system/etc/security/cacerts
-if [ -d "$CACERTS" ]; then
-    export SSL_CERT_DIR="$CACERTS"
-    unset SSL_CERT_FILE
+BUNDLE="$PYHOME/ssl/cacerts.pem"
+if [ -d "$CACERTS" ] && [ ! -f "$BUNDLE" ]; then
+    mkdir -p "$PYHOME/ssl" 2>/dev/null
+    cat "$CACERTS"/*.0 > "$BUNDLE" 2>/dev/null
+    chmod 755 "$PYHOME/ssl" 2>/dev/null
+    chmod 644 "$BUNDLE" 2>/dev/null
+fi
+if [ -f "$BUNDLE" ]; then
+    export SSL_CERT_FILE="$BUNDLE"
+    unset SSL_CERT_DIR
 fi
 
 mkdir -p "$HOME" 2>/dev/null
