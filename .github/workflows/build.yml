@@ -211,7 +211,7 @@ jobs:
           *static*
 
           # --- compression ---
-          binascii binascii.c
+          binascii binascii.c -I\$(ZLIB_INC) -L\$(ZLIB_LIB) -lz
           zlib zlibmodule.c -I\$(ZLIB_INC) -L\$(ZLIB_LIB) -lz
 
           # --- OpenSSL ---
