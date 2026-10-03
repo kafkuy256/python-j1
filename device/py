@@ -10,8 +10,15 @@ export TMPDIR=/data/local/tmp
 export PYTHONUTF8=1
 export PYTHONIOENCODING=utf-8
 unset PYTHONPATH
-unset SSL_CERT_FILE
-unset SSL_CERT_DIR
+
+# OpenSSL was built with its own openssldir, so point it at the CA store
+# Android already ships. Without this, ssl.create_default_context() cannot
+# verify any server.
+CACERTS=/system/etc/security/cacerts
+if [ -d "$CACERTS" ]; then
+    export SSL_CERT_DIR="$CACERTS"
+    unset SSL_CERT_FILE
+fi
 
 mkdir -p "$HOME" 2>/dev/null
 

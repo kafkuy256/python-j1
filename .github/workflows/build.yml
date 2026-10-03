@@ -377,9 +377,10 @@ jobs:
           ls -l "$PKG/bin"
           file "$PKG/bin/python3"
 
-          tar czf python-j1-${{ env.PYVER }}-armv7l-musl.tar.gz \
-            -C "$GITHUB_WORKSPACE/artifact" pyhome py
-          ls -l python-j1-${{ env.PYVER }}-armv7l-musl.tar.gz
+          # NB: write the tarball outside the tree that is being archived.
+          TARBALL="$GITHUB_WORKSPACE/python-j1-${{ env.PYVER }}-armv7l-musl.tar.gz"
+          tar czf "$TARBALL" -C "$GITHUB_WORKSPACE/artifact" pyhome py
+          ls -l "$TARBALL"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
