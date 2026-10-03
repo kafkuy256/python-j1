@@ -1,0 +1,4 @@
+* text=auto eol=lf
+device/py text eol=lf
+.github/workflows/*.yml text eol=lf
+*.py text eol=lf
