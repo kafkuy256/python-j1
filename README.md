@@ -54,6 +54,13 @@ adb push py /data/local/tmp/py
 adb shell "su -c 'chmod 755 /data/local/tmp/py /data/local/tmp/pyhome/bin/python3'"
 ```
 
+Then put `python`, `python3` and `py` on `PATH` once:
+
+```
+adb push device/python-links.sh /data/local/tmp/
+adb shell "su -c 'sh /data/local/tmp/python-links.sh'"
+```
+
 ## Run
 
 ```
@@ -61,9 +68,56 @@ adb shell "su -c '/data/local/tmp/py /sdcard/script.py'"
 adb shell "/data/local/tmp/py -c 'print(1+1)'"
 ```
 
-`py` is only a wrapper: it sets `PYTHONHOME`, `HOME`, `TMPDIR`, `PYTHONUTF8=1`,
-builds a CA bundle from `/system/etc/security/cacerts` on first run, then
-`exec`s `pyhome/bin/python3.11`.
+`py` is only a launcher: it sets `PYTHONHOME`, `HOME`, `TMPDIR`, `PYTHONUTF8=1`,
+builds the CA bundle on first run, then `exec`s `pyhome/bin/python3.11`.
+
+## Running files the usual way
+
+After `python-links.sh` the phone behaves like a normal Linux box:
+
+```
+adb shell                              # shell user
+cd /storage/emulated/0
+python3 script.py arg1                 # python / py also work
+python3 -c 'print(1+1)'
+python3 -m json.tool < data.json
+python3                                # interactive REPL
+```
+
+Standard semantics apply, verified on the device:
+
+* `sys.path[0]` is the script's folder, so `import sibling` works for modules
+  next to the script;
+* `__file__` and `sys.argv` are normal;
+* a relative `open("data.txt")` resolves against the **current directory**,
+  exactly like on Linux and Windows — so either `cd` to the script first or use
+  `os.path.dirname(__file__)`.
+
+### `./script.py`
+
+Android's kernel cannot use a shell script as a `#!/...` interpreter, so a
+plain `#!/data/local/tmp/py` header does not work. Use a four-line
+sh/Python polyglot instead — copy the header from
+[`device/script-template.py`](device/script-template.py):
+
+```python
+#!/system/bin/sh
+""":"
+exec /data/local/tmp/py "$0" "$@"
+":"""
+# ordinary Python from here on
+```
+
+Then:
+
+```
+adb push script.py /storage/emulated/0/
+adb shell "su -c 'chmod 755 /storage/emulated/0/script.py'"
+adb shell "su -c 'cd /storage/emulated/0 && ./script.py'"
+```
+
+This works from `/data` and from `/sdcard`, keeps full arguments, and gets the
+complete environment. (`chmod +x` is required — that is the Linux rule too.)
 
 ## Device notes
 
@@ -80,9 +134,11 @@ Public resolvers do not answer on this network — UDP/53 to `8.8.8.8` and
 `mount -o remount,ro /system`.
 
 **Certificates.** Android's CA files are named with a hash format OpenSSL 3.x
-does not match when it walks a `capath`, so the wrapper concatenates them into
-`pyhome/ssl/cacerts.pem` and exports `SSL_CERT_FILE`. With that,
-`ssl.create_default_context()` verifies normally (TLS 1.3, HTTP 200 verified).
+does not match when it walks a `capath`, so the launcher concatenates them into
+`pyhome/ssl/cert.pem` — the name OpenSSL was configured with via
+`--openssldir` — and exports `SSL_CERT_FILE`. With that,
+`ssl.create_default_context()` verifies normally (TLS 1.3, HTTP 200 verified),
+and even the bare `pyhome/bin/python3.11` works with no environment at all.
 
 **Run your own scripts.**
 
