@@ -15,4 +15,4 @@ unset SSL_CERT_DIR
 
 mkdir -p "$HOME" 2>/dev/null
 
-exec "$PYHOME/bin/python3" "$@"
+exec "$PYHOME/bin/python3.11" "$@"
