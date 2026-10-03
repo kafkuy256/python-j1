@@ -5,13 +5,16 @@ on:
 
 env:
   PYVER: "3.11.17"
-  TARGET: armv7l-linux-musleabihf
+  TARGET: armv7-linux-musleabihf
   PREFIX: /data/local/tmp/pyhome
   ZLIB_VER: "1.3.2"
   OPENSSL_VER: "3.0.22"
   SQLITE_YEAR: "2026"
   SQLITE_NUMBER: "3530400"
   SQLITE_SHA256: "454e45f61c6bd75b7420e7190732dea03ce6639c63ada47bbc592f67fc34c0338"
+  MUSLCROSS_TAG: "20261001"
+  MUSLCROSS_SHA256: "6148dad77a465411e422393d3f31424c2b65b9abe42c67e7a106d0a92ab86023"
+  BOOTLIN_SHA256: "9147bafae4aa272321a3c6440d04d83b7e23411b2d344f875541d84c4444ba9b"
 
 jobs:
   build:
@@ -31,29 +34,87 @@ jobs:
             ca-certificates curl wget xz-utils bzip2 file \
             zlib1g-dev libffi-dev
 
-      - name: Cache musl cross toolchain
-        id: cache-tc
-        uses: actions/cache@v4
-        with:
-          path: ~/cross
-          key: musl-cross-${{ env.TARGET }}-v1
-
       - name: Install musl cross toolchain
-        if: steps.cache-tc.outputs.cache-hit != 'true'
         run: |
-          set -eux
-          mkdir -p ~/cross
-          curl -fsSL https://musl.cc/${{ env.TARGET }}-cross.tgz \
-            | tar xz -C ~/cross --strip-components=1
-          chmod -R a+rX ~/cross
+          set -eu
+          CROSS=armv7-linux-musleabihf
+          TC=$HOME/cross
+          DL=$HOME/tc-dl
+          rm -rf "$TC"
+          mkdir -p "$TC" "$DL"
+
+          # musl.cc is unreachable from the Actions runners, so the official
+          # musl-cross release is tried first; Bootlin is the backup.
+          fetch() {
+            url="$1"
+            want="$2"
+            out="$DL/$(basename "$url")"
+            echo "::group::fetch $url"
+            if ! curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 20 \
+                    --max-time 900 -o "$out" "$url"; then
+              echo "::endgroup::"
+              echo "download failed: $url"
+              return 1
+            fi
+            if [ "$want" != "-" ]; then
+              if ! echo "$want  $out" | sha256sum -c -; then
+                echo "::endgroup::"
+                echo "checksum failed: $url"
+                return 1
+              fi
+            fi
+            echo "::endgroup::"
+            echo "$out"
+          }
+
+          ARCHIVE=""
+          for spec in \
+            "https://github.com/cross-tools/musl-cross/releases/download/$MUSLCROSS_TAG/armv7-unknown-linux-musleabihf.tar.xz|$MUSLCROSS_SHA256" \
+            "https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--musl--stable-2026.08-1.tar.xz|$BOOTLIN_SHA256" \
+            "https://musl.cc/armv7l-linux-musleabihf-cross.tgz|-"
+          ; do
+            url=${spec%%|*}
+            want=${spec##*|}
+            echo "### trying $url"
+            if ARCHIVE=$(fetch "$url" "$want" 2>/dev/null | tail -n1) && [ -f "$ARCHIVE" ]; then
+              break
+            fi
+            ARCHIVE=""
+          done
+          if [ -z "$ARCHIVE" ]; then
+            echo "ERROR: no musl cross toolchain could be downloaded"
+            exit 1
+          fi
+          echo "using $ARCHIVE"
+
+          tar xf "$ARCHIVE" -C "$TC" --strip-components=1
+
+          # Normalise the tool names: whatever triple the archive uses, expose
+          # everything as $CROSS-* so the rest of the workflow is uniform.
+          GCCBIN=$(ls "$TC"/bin/*-gcc | head -n1)
+          TRIPLE=$(basename "$GCCBIN" | sed 's/-gcc$//')
+          echo "toolchain triple: $TRIPLE"
+          for t in "$TC"/bin/"$TRIPLE"-*; do
+            b=$(basename "$t")
+            ln -sfn "$t" "$TC/bin/$CROSS-${b#"$TRIPLE"-}"
+          done
+          for t in gcc cpp ar as ld nm objcopy objdump ranlib readelf strip; do
+            [ -e "$TC/bin/$TRIPLE-$t" ] && ln -sfn "$TC/bin/$TRIPLE-$t" "$TC/bin/$CROSS-$t"
+          done
+          echo "$TC/bin" >> "$GITHUB_PATH"
 
       - name: Report toolchain
         run: |
           set -eux
-          echo "$HOME/cross/bin" >> "$GITHUB_PATH"
           ${{ env.TARGET }}-gcc --version
           ${{ env.TARGET }}-gcc -dumpmachine
-          ls ~/cross/${{ env.TARGET }}/lib | tr '\n' ' '
+          ${{ env.TARGET }}-gcc -print-multi-lib
+          echo 'int main(void){return 0;}' > t.c
+          ${{ env.TARGET }}-gcc -static -o t t.c
+          file t
+          ${{ env.TARGET }}-strip t
+          file t
+          ls ~/cross | tr '\n' ' '
 
       - name: Build zlib (static, armv7l musl)
         run: |
