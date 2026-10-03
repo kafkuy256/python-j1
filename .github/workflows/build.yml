@@ -179,12 +179,21 @@ jobs:
           cp sqlite3.h "$DEPS/include/"
           ls -l "$DEPS/lib"
 
-      - name: Build host CPython ${{ env.PYVER }} (build interpreter)
+      - name: Unpack CPython sources
         run: |
           set -eux
           curl -fsSLO https://www.python.org/ftp/python/${{ env.PYVER }}/Python-${{ env.PYVER }}.tgz
+          # Two separate trees on purpose: the host build must not leave x86-64
+          # objects behind that the cross build would happily relink.
           tar xzf Python-${{ env.PYVER }}.tgz
-          cd Python-${{ env.PYVER }}
+          mv Python-${{ env.PYVER }} Python-${{ env.PYVER }}-host
+          tar xzf Python-${{ env.PYVER }}.tgz
+          ls -d Python-${{ env.PYVER }} Python-${{ env.PYVER }}-host
+
+      - name: Build host CPython ${{ env.PYVER }} (build interpreter)
+        run: |
+          set -eux
+          cd Python-${{ env.PYVER }}-host
           ./configure --prefix="$GITHUB_WORKSPACE/hostpy" --without-ensurepip \
             CFLAGS="-O1"
           make -j"$(nproc)"
