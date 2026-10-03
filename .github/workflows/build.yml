@@ -68,11 +68,8 @@ jobs:
           }
 
           ARCHIVE=""
-          for spec in \
-            "https://github.com/cross-tools/musl-cross/releases/download/$MUSLCROSS_TAG/armv7-unknown-linux-musleabihf.tar.xz|$MUSLCROSS_SHA256" \
-            "https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--musl--stable-2026.08-1.tar.xz|$BOOTLIN_SHA256" \
-            "https://musl.cc/armv7l-linux-musleabihf-cross.tgz|-"
-          ; do
+          SPECS="https://github.com/cross-tools/musl-cross/releases/download/$MUSLCROSS_TAG/armv7-unknown-linux-musleabihf.tar.xz|$MUSLCROSS_SHA256 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--musl--stable-2026.08-1.tar.xz|$BOOTLIN_SHA256 https://musl.cc/armv7l-linux-musleabihf-cross.tgz|-"
+          for spec in $SPECS; do
             url=${spec%%|*}
             want=${spec##*|}
             echo "### trying $url"
