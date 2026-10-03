@@ -11,7 +11,7 @@ env:
   OPENSSL_VER: "3.0.22"
   SQLITE_YEAR: "2026"
   SQLITE_NUMBER: "3530400"
-  SQLITE_SHA256: "454e45f61c6bd75b7420e7190732dea03ce6639c63ada47bbc592f67fc34c0338"
+  SQLITE_SHA256: "454e45f61c6bd75b7420e7190732dea03ce6639c63ada47bbc592f67fc340338"
   MUSLCROSS_TAG: "20261001"
   MUSLCROSS_SHA256: "6148dad77a465411e422393d3f31424c2b65b9abe42c67e7a106d0a92ab86023"
   BOOTLIN_SHA256: "9147bafae4aa272321a3c6440d04d83b7e23411b2d344f875541d84c4444ba9b"
@@ -28,6 +28,12 @@ jobs:
       - name: Install build dependencies
         run: |
           set -eux
+          for h in "$SQLITE_SHA256" "$MUSLCROSS_SHA256" "$BOOTLIN_SHA256"; do
+            if [ "${#h}" -ne 64 ]; then
+              echo "ERROR: pinned SHA256 '$h' is ${#h} chars, expected 64"
+              exit 1
+            fi
+          done
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool pkg-config \
