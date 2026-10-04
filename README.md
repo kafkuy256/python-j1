@@ -51,15 +51,25 @@ Not built (they need libraries that would be pointless on this device):
 ```
 adb push pyhome /data/local/tmp/
 adb push py /data/local/tmp/py
-adb shell "su -c 'chmod 755 /data/local/tmp/py /data/local/tmp/pyhome/bin/python3'"
+adb push device/setup.sh /data/local/tmp/
+adb shell "su -c 'chmod 755 /data/local/tmp/py /data/local/tmp/setup.sh'"
+adb shell "su -c 'sh /data/local/tmp/setup.sh'"
 ```
 
-Then put `python`, `python3` and `py` on `PATH` once:
+`setup.sh` does the three things that live outside `/data/local/tmp` and are
+therefore lost on every firmware flash: the `python`/`python3`/`py` symlinks in
+`/system/bin`, `/etc/resolv.conf` for musl (DNS is taken from the `net.dns1`
+property, so it follows whatever router the phone is on), and the TLS
+certificate bundle. It finishes with a smoke test.
 
-```
-adb push device/python-links.sh /data/local/tmp/
-adb shell "su -c 'sh /data/local/tmp/python-links.sh'"
-```
+Individual pieces, if you need them:
+
+| script | what it does |
+|---|---|
+| `device/setup.sh` | everything below, plus a smoke test |
+| `device/python-links.sh` | only the `/system/bin` symlinks |
+| `device/dns.sh` | only `/etc/resolv.conf` (router address hard-coded) |
+| `device/sdcard.sh` | bind mount, only needed if `/sdcard` is a dead link |
 
 ## Run
 
