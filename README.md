@@ -56,11 +56,12 @@ adb shell "su -c 'chmod 755 /data/local/tmp/py /data/local/tmp/setup.sh'"
 adb shell "su -c 'sh /data/local/tmp/setup.sh'"
 ```
 
-`setup.sh` does the three things that live outside `/data/local/tmp` and are
-therefore lost on every firmware flash: the `python`/`python3`/`py` symlinks in
-`/system/bin`, `/etc/resolv.conf` for musl (DNS is taken from the `net.dns1`
-property, so it follows whatever router the phone is on), and the TLS
-certificate bundle. It finishes with a smoke test.
+`setup.sh` does everything that lives outside `/data/local/tmp` and is
+therefore lost on every firmware flash: the `python`/`python3`/`py`/`pip`
+entries in `/system/bin`, `/etc/resolv.conf` for musl (DNS is taken from the
+`net.dns1` property, so it follows whatever router the phone is on), the TLS
+certificate bundle, pip itself and the `tzdata` time zone database. It ends
+with a smoke test.
 
 Individual pieces, if you need them:
 
@@ -183,5 +184,37 @@ sqlite3, file I/O) works as root. Run as the `shell` user instead if you need
 adb shell "/data/local/tmp/py /sdcard/myscript.py"      # subprocess works
 ```
 
-**Time zones.** Android has no `zoneinfo` tree and `tzdata` is not installed,
-so `zoneinfo` and `time.localtime()` only know UTC.
+**Time zones.** `setup.sh` installs the `tzdata` package, which carries a full
+TZif tree. The launcher points `PYTHONTZPATH` at it and sets `TZ` so that
+`time.localtime()` stops returning UTC. Change the zone by editing one file:
+
+```
+adb shell "su -c 'echo Europe/Berlin > /data/local/tmp/tz'"
+```
+
+Any name from the tz database works (`Asia/Almaty`, `America/New_York`, ...).
+An unknown name falls back to UTC instead of failing.
+
+## pip
+
+`setup.sh` bootstraps pip with `get-pip.py` (it needs DNS + TLS; if the phone is
+offline it says so and skips it). Afterwards it is a normal command:
+
+```
+adb shell
+pip install requests
+python3 -c 'import requests; print(requests.get("https://example.com").status_code)'
+```
+
+What works: pure-Python packages and any wheel that ships an `armv7l` or
+`any` binary extension.
+
+What does not, because the device has no compiler:
+
+* building from source (`pip install --no-binary`), which needs a toolchain;
+* any package with a prebuilt binary only for other architectures — pip has no
+  armv7l wheel for those, and `--only-binary=:all:` is the way to skip them;
+* `.tar.xz` sdists, because `_lzma` is not built in.
+
+`pip install --only-binary=:all: <package>` is the safe habit. Wheel is
+installed as well, so `pip wheel` works for packages that do have wheels.
