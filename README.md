@@ -58,10 +58,23 @@ adb shell "su -c 'sh /data/local/tmp/setup.sh'"
 
 `setup.sh` does everything that lives outside `/data/local/tmp` and is
 therefore lost on every firmware flash: the `python`/`python3`/`py`/`pip`
-entries in `/system/bin`, `/etc/resolv.conf` for musl (DNS is taken from the
-`net.dns1` property, so it follows whatever router the phone is on), the TLS
-certificate bundle, pip itself and the `tzdata` time zone database. It ends
-with a smoke test.
+entries in `/system/bin`, `/etc/resolv.conf` for musl, the TLS certificate
+bundle, pip itself and the `tzdata` time zone database. It ends with a smoke
+test.
+
+Two things it has to cope with:
+
+* **Where the system partition is mounted.** Up to Android 9 `/system` is its
+  own mount; on Android 10 with system-as-root it is the root mount, so
+  `mount -o remount,rw /system` fails with *not in /proc/mounts*. The script
+  tries `/system` and falls back to `/`.
+* **Finding a DNS server.** Android stopped publishing `net.dns1` around
+  Android 8. The script tries the legacy properties, then the DHCP ones, then
+  the default-route gateway — on a home router the resolver and the gateway
+  are the same machine. If the phone is offline it says so and you re-run it.
+
+If the phone has no network but `/data/local/tmp/wheels` holds wheels pushed
+from a PC, `setup.sh` installs pip from those instead of downloading.
 
 Individual pieces, if you need them:
 
@@ -71,6 +84,17 @@ Individual pieces, if you need them:
 | `device/python-links.sh` | only the `/system/bin` symlinks |
 | `device/dns.sh` | only `/etc/resolv.conf` (router address hard-coded) |
 | `device/sdcard.sh` | bind mount, only needed if `/sdcard` is a dead link |
+
+## Verified on
+
+| device | OS | notes |
+|---|---|---|
+| Galaxy J1 mini, SM-J105H | LineageOS 6.0.1 (Android 6.0) | SELinux permissive |
+| Galaxy J1 mini, SM-J05H | LineageOS 10 (Android 10) | system-as-root, `net.dns1` empty |
+| Galaxy A3, SM-A310F | LineageOS 10 (Android 10) | system-as-root, SELinux enforcing |
+
+The same artifact runs on all three — they are all 32-bit ARMv7 with VFP, and
+the binary links musl statically, so Bionic plays no part.
 
 ## Run
 
