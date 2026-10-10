@@ -87,14 +87,19 @@ Individual pieces, if you need them:
 
 ## Verified on
 
+Two phones, three ROM configurations:
+
 | device | OS | notes |
 |---|---|---|
-| Galaxy J1 mini, SM-J105H | LineageOS 6.0.1 (Android 6.0) | SELinux permissive |
-| Galaxy J1 mini, SM-J05H | LineageOS 10 (Android 10) | system-as-root, `net.dns1` empty |
-| Galaxy A3, SM-A310F | LineageOS 10 (Android 10) | system-as-root, SELinux enforcing |
+| Galaxy J1 mini, SM-J105H | stock Android 5.1.1 | SuperSU, SELinux enforcing, `/system` its own mount |
+| Galaxy J1 mini (same phone, re-flashed) | LineageOS 6.0.1, reporting SM-J05H | Magisk, SELinux permissive |
+| Galaxy A3, SM-A310F | LineageOS 10 (Android 10) | Magisk, SELinux enforcing, system-as-root, `net.dns1` empty |
 
-The same artifact runs on all three — they are all 32-bit ARMv7 with VFP, and
-the binary links musl statically, so Bionic plays no part.
+The same artifact runs on all of them: 32-bit ARMv7 with VFP, and the binary
+links musl statically, so Bionic and the Android version play no part. Note
+that a ROM can report a different model string than the hardware — the J1
+mini shows up as SM-J105H on the stock ROM and SM-J05H on LineageOS, but it is
+the same phone (same serial), so that is not a different device.
 
 ## Run
 
